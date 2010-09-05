@@ -1,0 +1,6 @@
+code:add_pathz("../../gdss-ubf-proto__HEAD/ebin").
+code:add_pathz("../../../erl-tools/ubf-jsonrpc__HEAD/ebin").
+%% This path will differ depending on where you checked out the UBF code.
+%% http://github.com/norton/ubf
+code:add_pathz("/Users/fritchie/src/ubf/ubf/./src/erl-tools/ubf__HEAD/ebin").
+application:start(gdss_ubf_proto).
