@@ -824,31 +824,31 @@ delete(ServerName, Node, Key, Flags, Timeout)
         Else  -> Else
     end.
 
-%% @spec (brick_name(), node_name(), io_list(), integer())
+%% @spec (brick_name(), node_name(), io_list() | ?BRICK__GET_MANY_FIRST, integer())
 %%    -> zzz_getmany_reply()
 %% @equiv getmany(ServerName, Node, Key, MaxNum, [], DefaultTimeout)
 %% @doc Get many Key/Value pairs from a brick, up to MaxNum.
 
--spec get_many(brick_name(), node_name(), key(), integer()) -> getmany_reply().
+-spec get_many(brick_name(), node_name(), key() | ?BRICK__GET_MANY_FIRST, integer()) -> getmany_reply().
 get_many(ServerName, Node, Key, MaxNum) ->
     get_many(ServerName, Node, Key, MaxNum, [], ?FOO_TIMEOUT).
 
-%% @spec (brick_name(), node_name(), io_list(), integer(), prop_list() | timeout())
+%% @spec (brick_name(), node_name(), io_list() | ?BRICK__GET_MANY_FIRST, integer(), prop_list() | timeout())
 %%    -> zzz_getmany_reply()
 %% @equiv getmany(ServerName, Node, Key, MaxNum, [], DefaultTimeoutOrFlags)
 %% @doc Get many Key/Value pairs from a brick, up to MaxNum.
 
--spec get_many(brick_name(), node_name(), key(), integer(), flags_list() | timeout()) -> getmany_reply().
+-spec get_many(brick_name(), node_name(), key() | ?BRICK__GET_MANY_FIRST, integer(), flags_list() | timeout()) -> getmany_reply().
 get_many(ServerName, Node, Key, MaxNum, Flags) when is_list(Flags) ->
     get_many(ServerName, Node, Key, MaxNum, Flags, ?FOO_TIMEOUT);
 get_many(ServerName, Node, Key, MaxNum, Timeout) when is_integer(Timeout) ->
     get_many(ServerName, Node, Key, MaxNum, [], Timeout).
 
-%% @spec (brick_name(), node_name(), io_list(), integer(), prop_list(), timeout())
+%% @spec (brick_name(), node_name(), io_list() | ?BRICK__GET_MANY_FIRST, integer(), prop_list(), timeout())
 %%    -> zzz_getmany_reply()
 %% @doc Get many Key/Value pairs from a brick, up to MaxNum.
 
--spec get_many(brick_name(), node_name(), key(), integer(), flags_list(), timeout()) -> getmany_reply().
+-spec get_many(brick_name(), node_name(), key() | ?BRICK__GET_MANY_FIRST, integer(), flags_list(), timeout()) -> getmany_reply().
 get_many(ServerName, Node, Key, MaxNum, Flags, Timeout)
   when not is_list(Node), is_integer(MaxNum),
        is_list(Flags), is_integer(Timeout) ->
@@ -857,11 +857,11 @@ get_many(ServerName, Node, Key, MaxNum, Flags, Timeout)
         Else  -> Else
     end.
 
-%% @spec (brick_name(), node_name(), io_list(), integer(), prop_list(), prop_list(), timeout())
+%% @spec (brick_name(), node_name(), io_list() | ?BRICK__GET_MANY_FIRST, integer(), prop_list(), prop_list(), timeout())
 %%    -> zzz_getmany_reply()
 %% @doc Get many Key/Value pairs from a brick, up to MaxNum.
 
--spec get_many(brick_name(), node_name(), key(), integer(), flags_list(), prop_list(), timeout()) -> getmany_reply().
+-spec get_many(brick_name(), node_name(), key() | ?BRICK__GET_MANY_FIRST, integer(), flags_list(), prop_list(), timeout()) -> getmany_reply().
 get_many(ServerName, Node, Key, MaxNum, Flags, DoFlags, Timeout)
   when not is_list(Node), is_integer(MaxNum),
        is_list(Flags), is_list(DoFlags), is_integer(Timeout) ->
@@ -2686,7 +2686,10 @@ make_resum_quota(KeyArg) ->
 -spec make_op2(atom(), key() | ?BRICK__GET_MANY_FIRST, flags_or_fun_list()) ->
                       {atom(), binary(), flags_or_fun_list()}.
 make_op2(OpName, Key, Flags) ->
-    {OpName, gmt_util:bin_ify(Key), encode_op_flags(Flags)}.
+    OpKey = if Key == ?BRICK__GET_MANY_FIRST -> Key;
+               true                          -> gmt_util:bin_ify(Key)
+            end,
+    {OpName, OpKey, encode_op_flags(Flags)}.
 
 %% @spec (atom(), term(), term(), integer(), prop_list()) -> do_op()
 %% @doc Create a 5-argument do op (see encode_op_flags() for valid flags).
@@ -2814,9 +2817,8 @@ extract_do_list_keys_find_bricks(DoList, GH) ->
 %% thing is broken in the general case.
 
 extract_do_list_keys_find_bricks([{get_many, ?BRICK__GET_MANY_FIRST, _}],
-                                 _GH, _S)->
-    %%{[{S#state.name, node()}], [{read, ?BRICK__GET_MANY_FIRST}]};
-    exit({extract_do_list_keys_find_bricks, not_implemented, get_many_first});
+                                 _GH, S)->
+    {[{S#state.name, node()}], [{read, <<>>}], read};
 extract_do_list_keys_find_bricks(DoList, GH, S) ->
     RdWr_Keys = harvest_do_keys(DoList, S),
     WhereList =
