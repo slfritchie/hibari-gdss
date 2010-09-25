@@ -1,0 +1,2 @@
+brick_admin:fast_sync({tab1_ch2_b1, node()}, {tab1_ch2_b2, node()}, 'gdss1@bb3').
+brick_admin:fast_sync({tab1_ch3_b1, node()}, {tab1_ch3_b2, node()}, 'gdss1@bb3').

@@ -1,0 +1,914 @@
+LHmig1ch = brick_hash:naive_init([{tab2_ch1, [{tab2_ch1_b1, node()}, {tab2_ch1_b2, node()}]}]).
+LHmig2ch = brick_hash:naive_init([{tab2_ch1, [{tab2_ch1_b1, node()}, {tab2_ch1_b2, node()}]}, {tab2_ch2, [{tab2_ch2_b1, node()}, {tab2_ch2_b2, node()}]}]).
+brick_admin:start_migration(tab2, LHmig1ch, [{max_keys_per_iter, 5}, {propagation_delay, 500}]).
+brick_admin:start_migration(tab2, LHmig2ch, [{max_keys_per_iter, 5}, {propagation_delay, 500}]).
+gmt_elog:start_tracing("/tmp/trace10").
+gmt_elog:add_match_spec(dbg:fun2ms(fun([_, _, brick_server, 1496, _, _]) -> return_trace() end)).
+code:add_pathz("../../gdss-ubf-proto__HEAD/ebin").
+code:add_pathz("/c/fritchie/gemini/svn.brick-migration-fixes/src/erl-third-party/sics/ubf__HEAD/ebin").
+application:start(gdss_ubf_proto).
+
+ok = brick_test0:chain_all().
+ok = brick_test0:single_brick_regression().
+{ok = brick_test0:single_brick_regression(), ok = brick_test0:chain_all()}.
+  NOTE: single_brick_regression may fail if old *LOG files are lying around,
+	so if it fails, try it a 2nd time.
+  make run-app1-interactive
+  brick_admin:start("Schema.local").
+  eqc:quickcheck(eqc:numtests(2000, simple_qc:prop_simple1())).
+  eqc:quickcheck(eqc:numtests(2000, simple_qc:prop_quota1())).
+  eqc:quickcheck(eqc:numtests(2000, hlog_qc:prop_log())).
+  %% VM crash problem child:
+  eqc:quickcheck(eqc:numtests(2000, hlog_qc:prop_log(true))).
+
+  gmt_loop:tc(fun() -> [{ io:format("1"), brick_admin:change_chain_length(tab1_ch1, [{tab1_ch1_b1, node()}]), timer:sleep(4*1000), io:format("2"), brick_admin:change_chain_length(tab1_ch1, [{tab1_ch1_b1, node()}, {tab1_ch1_b2, node()}]), timer:sleep(10*1000)} || _ <- lists:seq(1,1*8)] end).
+  brick_admin:change_chain_length(tab1_ch1, [{tab1_ch1_b1, node()}])
+  Fm = fun(N) -> brick_admin:start_migration(tab1, brick_hash:naive_init(brick_admin:make_chain_description(tab1, 1, lists:duplicate(N, node())))) end.
+  [{io:format("x"), Fm(1), timer:sleep(9000), Fm(4), timer:sleep(12000)} || _ <- lists:seq(1,7)].
+  Fm(1).
+
+brick_server:start_link(regression_test0, []).
+brick_server:chain_set_my_repair_state(regression_test0, node(), ok).
+brick_server:chain_role_standalone(regression_test0, node()).
+brick_test0:t50(regression_test0, node(), 50, true).
+brick_test0:t51(regression_test0, node(), 10, 10, true).
+%
+catch dbgon(asdflkj, asdf), dbgadd(brick_ets, bigdata_dir_store_val), dbgadd(brick_ets, bigdata_dir_delete_val), dbgadd(brick_ets, bigdata_dir_get_val), dbgadd(file, read_file), dbgadd(file, write_file), dbgadd(file, delete), dbgadd(file, rename).
+
+%%
+
+NameHead = ch1_head, NameTail = ch1_tail, Node = node().
+{ok, _} = brick_server:start_link(NameHead, []).
+{ok, _} = brick_server:start_link(NameTail, []).
+brick_server:chain_set_my_repair_state(NameTail, Node, undefined).
+brick_server:chain_role_tail(NameTail, Node, NameHead, Node, []).
+brick_server:chain_role_head(NameHead, Node, NameTail, Node, []).
+brick_server:chain_start_repair(NameHead, Node).
+brick_server:chain_start_repair(NameMiddle, Node).
+
+NameHead = ch1_head, NameMiddle = ch1_middle, NameTail = ch1_tail, Node = node().
+l(brick_server).
+{ok, _} = brick_server:start_link(NameHead, []).
+{ok, _} = brick_server:start_link(NameMiddle, []).
+{ok, _} = brick_server:start_link(NameTail, []).
+brick_server:chain_set_my_repair_state(NameMiddle, Node, undefined).
+brick_server:chain_set_my_repair_state(NameTail, Node, undefined).
+brick_server:chain_set_my_repair_state(NameHead, Node, ok).
+brick_server:chain_role_tail(NameTail, Node, NameMiddle, Node, []).
+brick_server:chain_role_middle(NameMiddle, Node, NameHead, Node, NameTail, Node, []).
+brick_server:chain_role_head(NameHead, Node, NameMiddle, Node, []).
+brick_server:chain_start_repair(NameHead, Node).
+brick_server:chain_start_repair(NameMiddle, Node).
+
+BLstand = brick_hash:invent_nodelist(2, 1, node(), 0).
+[brick_test0:chain_start_entire_chain(C, [], true) || C <- BLstand].
+[brick_test0:chain_start_entire_chain(C, [], true) || C <- brick_hash:invent_nodelist(2, 2, node(), 0)].
+
+  Chains_1_4 = brick_hash:invent_nodelist(1, 4, node(), 0).
+  LH_1_4 = brick_hash:naive_init(Chains_1_4).
+  GH_1_4 = brick_hash:init_global_hash_state(false, unused, 1, LH_1_4, unused, 1, LH_1_4, unused, Chains_1_4).
+  [brick_test0:chain_start_entire_chain(C, []) || C <- Chains_1_4].
+  [ brick_server:chain_hack_set_global_hash(Br, Nd, GH_1_4) || {Br, Nd} <- lists:append([List || {_, List} <- Chains_1_4]) ].
+  brick_server:get(test_ch0_head, node(), "foo1").
+  brick_server:get(test_ch0_middle1, node(), "foo1").
+  brick_server:get(test_ch0_middle2, node(), "foo1").
+  brick_server:get(test_ch0_tail, node(), "foo1").
+  brick_server:set(test_ch0_middle1, node(), "foo1", "New3 val").
+  brick_server:set(test_ch0_middle2, node(), "foo1", "New4 val").
+  brick_server:set(test_ch0_tail, node(), "foo1", "New5 val").
+
+
+  Chains_3_4 = brick_hash:invent_nodelist(3, 4, node(), 0).
+  LH_3_4 = brick_hash:naive_init(Chains_3_4).
+  GH_3_4 = brick_hash:init_global_hash_state(false, unused, 1, LH_3_4, unused, 1, LH_3_4, unused, Chains_3_4).
+  [brick_test0:chain_start_entire_chain(C, []) || C <- Chains_3_4].
+  [ brick_server:chain_hack_set_global_hash(Br, Nd, GH_3_4) || {Br, Nd} <- lists:append([List || {_, List} <- Chains_3_4]) ].
+
+  brick_simple:start_link().
+  MyTab = mytab.
+  brick_simple:set_gh(node(), MyTab, GH_3_4).
+  brick_simple:get(MyTab, "foo1").
+  brick_simple:set(MyTab, "foo1", "Val 1 for foo1").
+  brick_simple:get(MyTab, "foo1").
+  brick_simple:get(MyTab, "foo2").
+
+
+brick_admin:create_new_schema([{bootstrap_copy2, node()}, {bootstrap_copy1, node()}], "Schema-Chain.test1").
+%% brick_admin:bootstrap_existing_schema("Schema-Chain.test1").
+%% brick_admin:start_link("Schema-Chain.test1").
+brick_admin:start("Schema-Chain.test1").
+
+brick_admin:create_new_schema([{bootstrap_copy3, 'test_down@newbb'}, {bootstrap_copy1, node()}, {bootstrap_copy2, node()}], "Schema-Chain.test2-down").
+  i:ii(brick_chainmon).
+  i:ib(brick_chainmon, process_brickstatus_diffs, 5).
+  im().
+brick_admin:start("Schema-Chain.test2-down").
+brick_server:status(tabX_ch2_b2, node()).
+{tabX_ch2_b2,brick_dev@newbb} ! chain_admin_periodic.
+
+brick_admin:get_tables().
+Ch1s = [{tab1_ch1, [{tab1_ch1_hd, node()}]}].
+brick_admin:add_table(tab2, Ch1s, tab1_lhash, tab1_ghash).
+  brick_bp:state(pinger_tab1_ch1_hd).
+  brick_shepherd:stop_brick(tab1_ch1_hd).
+Ch2s = [{tab2_ch1, [{tab2_ch1_hd, 'test_down@newbb'}]}].
+brick_admin:add_table(tab2, Ch2s, tab2_lhash, tab2_ghash).
+Ch3s = [{tab3_ch1, [{tab3_ch1_hd, node()}, {tab3_ch1_tl, 'test_down@newbb'}]}].
+brick_admin:add_table(tab3, Ch3s, tab3_lhash, tab3_ghash).
+Ch4s = [{tab4_ch1, [{tab4_ch1_hd, node()}, {tab4_ch1_mid1, 'test_down@newbb'}, {tab4_ch1_mid2, node()}, {tab4_ch1_tl, 'test_down@newbb'}]}].
+brick_admin:add_table(tab4, Ch4s).
+Ch5s = brick_admin:make_chain_description(tab5, 2, [brick_dev@newbb, test_down@newbb]).
+brick_admin:add_table(tab5, brick_admin:make_chain_description(tab5, 2, [brick_dev@newbb, test_down@newbb])).
+  brick_admin:hack_all_tab_setup(tabX, 2, [node(), node()], [{zzz_foo, bar}]).
+  brick_simple:set(tabX, <<"Scott1">>, foo).
+  brick_simple:set(tabX, <<"Scott2">>, foo).
+  brick_simple:set(tabX, <<"Scott4">>, foo).
+  [brick_simple:set(tabX, list_to_binary("Scott" ++ integer_to_list(X)), foo) || X <- lists:seq(1,100)].
+  [brick_server:set_do_sync(X, false) || X <- [tabX_ch1_b1, tabX_ch1_b2, tabX_ch2_b1, tabX_ch2_b2]].
+  brick_simple:set(tabX, <<"aScott1">>, bar).
+  brick_simple:set(tabX, <<"zScott1">>, bar).
+  brick_simple:set(tabX, <<"~Scott1">>, bar).
+  brick_simple:set(tabX, <<"~Scott2">>, bar).
+  brick_simple:set(tabX, <<"~Scott3">>, bar).
+  brick_simple:set(tabX, <<"~Scott4">>, bar).
+  brick_simple:get_many(tabX, <<"Scott">>, 10).
+  brick_simple:get_many(tabX, <<"Scott">>, 10, [{binary_prefix, <<"Sc">>}]).
+
+
+io:format(brick_sb:dump_status()).
+brick_server:set(tab5_ch1_b1,brick_dev@newbb, 1, "val of 1").
+
+io:format(brick_sb:dump_history({brick,{tab1_ch1_hd,brick_dev@newbb}}, 15)).
+io:format(brick_sb:dump_history({brick,{tab2_ch1_hd, 'test_down@newbb'}}, 15)).
+dbgon(brick_chainmon, process_brickstatus_diffs).
+dbgon(brick_squorum).
+dbgadd(brick_server).
+dbgadd(brick_sb).
+dbgadd(brick_chainmon).
+dbgadd(brick_admin).
+dbgadd(brick_shepherd).
+brick_test0:chain_t35().
+l(brick_test0).
+l(brick_squorum).
+
+dbgon(brick_admin, fix_bad_bootstrap_done).
+dbgadd(brick_admin, fix_bad_bootstrap_replica).
+dbgadd(brick_server, do).
+
+erl -pz ../ebin -pz ../../../erl-apps/gmt-util__HEAD/ebin -sname test_down -central_config ../priv/central.conf -eval 'application:start(sasl).' -eval 'application:start(brick).'
+
+Br4 = [{tab4_ch1_hd,brick_dev@newbb}, {tab4_ch1_mid1,test_down@newbb}, {tab4_ch1_mid2,brick_dev@newbb}, {tab4_ch1_tl,test_down@newbb}].
+[{rpc:call(Nd, brick_shepherd, stop_brick, [Br])} || {Br, Nd} <- tl(tl(Br4))].
+[{spawn(fun() -> rpc:call(Nd, brick_shepherd, stop_brick, [Br]) end)} || {Br, Nd} <- lists:sublist(lists:sort(fun(_, _) -> random:uniform(100) < 50 end, Br4), random:uniform(4))].
+
+ChainGrp = brick_hash:invent_nodelist(1, 4, node(), 98).
+brick_test0:chain_start_entire_chain(hd(ChainGrp), [], true).
+Bs = element(2, hd(ChainGrp)).
+[{B1,N1}, {B2,N2}, {B3,N3}, {B4,N4}] = Bs.
+brick_server:status(B1,N1).
+brick_server:status(B4,N4).
+brick_server:status(B5,N5).
+brick_server:delete(B1,N1, 'SADFLKJSADFKLJsadfkljasdflkjasdf').
+brick_server:sync_down_the_chain(B1,N1, []).
+  {B5, N5} = {test_ch98_newtail, brick_dev@newbb}.
+  rpc:call(N5, brick_shepherd, start_brick, [B5, []]).
+  brick_server:chain_role_tail(B5, N5, B4, N4, [{official_tail, false}]).
+  brick_server:chain_role_middle(B4, N4, B3, N3, B5, N5, [{official_tail, true}]).
+  brick_server:chain_start_repair(B4, N4).
+    dbgon(brick_server, chain_send_downstream).
+    brick_server:set(B1,N1, 'SADFLKJSADFKLJsadfkljasdflkjasdf', foo).
+brick_server:status(B4,N4).
+brick_server:status(B5,N5).
+
+[brick_server:start_link(Br, []) || Br <- [foo, foo2]].
+[brick_server:chain_role_standalone(Br, node()) || Br <- [foo, foo2]].
+[brick_server:migration_start_sweep(Br, node(), []) || Br <- [foo, foo2]].
+brick_server:chain_set_my_repair_state(Br, node(), ok) || Br <- [foo, foo2]].
+brick_server:set(foo, node(), foo, foo1).
+brick_server:set(foo, node(), bar, bar1).
+brick_server:set(foo, node(), baz, baz1).
+brick_server:set(foo, node(), zoo, zoo1).
+brick_server:migration_start_sweep(foo, node(), []).    
+
+ChList20 = brick_hash:invent_nodelist(2, 1, node(), 20).
+[Ch20, Ch21] = ChList20.
+{Chain20, [{Brick20, Node20}]} = Ch20.
+{Chain21, [{Brick21, Node21}]} = Ch21.
+[brick_server:start_link(Br, []) || Br <- [Brick20, Brick21]].
+[brick_server:chain_role_standalone(Br, node()) || Br <- [Brick20, Brick21]].
+[brick_server:chain_set_my_repair_state(Br, node(), ok) || Br <- [Brick20, Brick21]].
+LHcur = brick_hash:naive_init([Ch20]).
+GHcur = brick_hash:init_global_hash_state(false, unused, 1, LHcur, [Ch20], LHcur, [Ch20]).
+[brick_server:chain_hack_set_global_hash(Br, node(), GHcur) || Br <- [Brick20, Brick21]].
+KVs = [{foo, foo1}, {bar, bar1}, {baz, baz1}, {zoo, zoo1}].
+[brick_server:delete(Brick21, node(), K) || {K, V} <- KVs].
+[brick_server:add(Brick20, node(), K, V) || {K, V} <- KVs].
+LHnew = brick_hash:naive_init(ChList20).
+GHmig = brick_hash:init_global_hash_state(true, unused, 1, LHcur, [Ch20], LHnew, ChList20).
+[brick_server:chain_hack_set_global_hash(Br, node(), GHmig) || Br <- [Brick20, Brick21]].
+brick_server:migration_start_sweep(Brick20, node(), Chain20, []).
+brick_server:migration_start_sweep(Brick21, node(), Chain21, []).
+  brick_server:get_many(Brick20, node(), '$start_of_table', 50).
+  brick_server:get_many(Brick21, node(), '$start_of_table', 50).
+  brick_server:get(Brick20, node(), foo).
+  brick_server:get(Brick21, node(), foo).
+
+%%% bb2-2 demo stuff
+
+brick_admin:create_new_schema([{bootstrap_copy1, 'brick_dev@bb2-2'}, {bootstrap_copy2, 'vm1@bb2-2'}, {bootstrap_copy3, 'vm2@bb2-2'}], "Schema-Chain.bb2-2").
+brick_admin:start("Schema-Chain.bb2-2").
+Ch1s = [{tab1_ch1, [{tab1_ch1_hd, 'brick_dev@bb2-2'}, {tab1_ch1_mid1, 'vm1@bb2-2'}, {tab1_ch1_tl, 'vm2@bb2-2'}]}].
+brick_admin:add_table(tab2, Ch1s).
+  brick_bp:state(pinger_tab1_ch1_hd).
+  brick_shepherd:stop_brick(tab1_ch1_hd).
+
+%% First time setupgdata_dir, BigDataDir}:
+
+brick_admin:create_new_schema([{bootstrap_copy1, node()}], "Schema-Chain.test1").
+brick_admin:start("Schema-Chain.test1").
+brick_admin:hack_all_tab_setup(tab1, 1, [node(), node()], [], true).
+brick_admin:start("Schema-Chain.test1").
+brick_admin:hack_all_tab_setup(tab1, 1, [node(), node()], [], false).
+[brick_server:set_do_sync(X, false) || X <- [tab1_ch1_b1, tab1_ch2_b1]].
+[brick_server:checkpoint(X, node(), [{old_logs, {rename, "./", ".KEEP1"}}]) || X <- [tab1_ch1_b1, tab1_ch2_b1]].
+
+% 2007-12-21
+% Steps to verify that the bigdata_dir feature works: the ETS
+% table does not contains real val terms.
+
+brick_admin:create_new_schema([{bootstrap_copy1, node()}], "Schema-Chain.test1").
+brick_admin:start("Schema-Chain.test1").
+brick_admin:hack_all_tab_setup(tab1, 1, [node(), node()], [{bigdata_dir, "./tab1-bigdata-dir"}], true).
+brick_server:status(tab1_ch1_b1, node()).
+	bigdata_dir should appear in implementation's options proplist!
+[brick_simple:set(tab1, list_to_binary("Scott" ++ integer_to_list(X)), <<"This value should reside only on disk.">>) || X <- lists:seq(1,10)].
+ets:tab2list(tab1_ch1_b1_store).
+[brick_simple:get(tab1, list_to_binary("Scott" ++ integer_to_list(X))) || X <- lists:seq(1,10)].
+
+% 2008-01-08
+% Setting up a cluster of nodes & chains, using the variable prefix method.
+% The only difference to prior calls to hack_all_tab_setup() is a new 6th
+% arg to specify the (opaque) local hash structure init function.
+
+brick_admin:hack_all_tab_setup(tabVar, 1, [node(), node()], [], true, fun brick_hash:var_prefix_init/1).
+brick_simple:set(tabVar, "foo/bar", <<"Something bar">>).
+brick_simple:get(tabVar, "foo/bar").
+ok = brick_test0:chain_all().
+ok = brick_test0:chain_t20().
+ok = brick_test0:chain_t25().
+ok = brick_test0:chain_t30().
+ok = brick_test0:chain_t31().
+ok = brick_test0:chain_t40().
+ok = brick_test0:chain_t41().
+ok = brick_test0:single_brick_regression().
+  NOTE: single_brick_regression may fail if old *LOG files are lying around,
+	so if it fails, try it a 2nd time.
+brick_server:start_link(regression_test0, []).
+brick_server:chain_set_my_repair_state(regression_test0, node(), ok).
+brick_server:chain_role_standalone(regression_test0, node()).
+brick_test0:t50(regression_test0, node(), 50, true).
+brick_test0:t51(regression_test0, node(), 10, 10, true).
+%
+catch dbgon(asdflkj, asdf), dbgadd(brick_ets, bigdata_dir_store_val), dbgadd(brick_ets, bigdata_dir_delete_val), dbgadd(brick_ets, bigdata_dir_get_val), dbgadd(file, read_file), dbgadd(file, write_file), dbgadd(file, delete), dbgadd(file, rename).
+
+%%
+
+NameHead = ch1_head, NameTail = ch1_tail, Node = node().
+{ok, _} = brick_server:start_link(NameHead, []).
+{ok, _} = brick_server:start_link(NameTail, []).
+brick_server:chain_set_my_repair_state(NameTail, Node, undefined).
+brick_server:chain_role_tail(NameTail, Node, NameHead, Node, []).
+brick_server:chain_role_head(NameHead, Node, NameTail, Node, []).
+brick_server:chain_start_repair(NameHead, Node).
+brick_server:chain_start_repair(NameMiddle, Node).
+
+NameHead = ch1_head, NameMiddle = ch1_middle, NameTail = ch1_tail, Node = node().
+l(brick_server).
+{ok, _} = brick_server:start_link(NameHead, []).
+{ok, _} = brick_server:start_link(NameMiddle, []).
+{ok, _} = brick_server:start_link(NameTail, []).
+brick_server:chain_set_my_repair_state(NameMiddle, Node, undefined).
+brick_server:chain_set_my_repair_state(NameTail, Node, undefined).
+brick_server:chain_set_my_repair_state(NameHead, Node, ok).
+brick_server:chain_role_tail(NameTail, Node, NameMiddle, Node, []).
+brick_server:chain_role_middle(NameMiddle, Node, NameHead, Node, NameTail, Node, []).
+brick_server:chain_role_head(NameHead, Node, NameMiddle, Node, []).
+brick_server:chain_start_repair(NameHead, Node).
+brick_server:chain_start_repair(NameMiddle, Node).
+
+BLstand = brick_hash:invent_nodelist(2, 1, node(), 0).
+[brick_test0:chain_start_entire_chain(C, [], true) || C <- BLstand].
+[brick_test0:chain_start_entire_chain(C, [], true) || C <- brick_hash:invent_nodelist(2, 2, node(), 0)].
+
+  Chains_1_4 = brick_hash:invent_nodelist(1, 4, node(), 0).
+  LH_1_4 = brick_hash:naive_init(Chains_1_4).
+  GH_1_4 = brick_hash:init_global_hash_state(false, unused, 1, LH_1_4, unused, 1, LH_1_4, unused, Chains_1_4).
+  [brick_test0:chain_start_entire_chain(C, []) || C <- Chains_1_4].
+  [ brick_server:chain_hack_set_global_hash(Br, Nd, GH_1_4) || {Br, Nd} <- lists:append([List || {_, List} <- Chains_1_4]) ].
+  brick_server:get(test_ch0_head, node(), "foo1").
+  brick_server:get(test_ch0_middle1, node(), "foo1").
+  brick_server:get(test_ch0_middle2, node(), "foo1").
+  brick_server:get(test_ch0_tail, node(), "foo1").
+  brick_server:set(test_ch0_middle1, node(), "foo1", "New3 val").
+  brick_server:set(test_ch0_middle2, node(), "foo1", "New4 val").
+  brick_server:set(test_ch0_tail, node(), "foo1", "New5 val").
+
+
+  Chains_3_4 = brick_hash:invent_nodelist(3, 4, node(), 0).
+  LH_3_4 = brick_hash:naive_init(Chains_3_4).
+  GH_3_4 = brick_hash:init_global_hash_state(false, unused, 1, LH_3_4, unused, 1, LH_3_4, unused, Chains_3_4).
+  [brick_test0:chain_start_entire_chain(C, []) || C <- Chains_3_4].
+  [ brick_server:chain_hack_set_global_hash(Br, Nd, GH_3_4) || {Br, Nd} <- lists:append([List || {_, List} <- Chains_3_4]) ].
+
+  brick_simple:start_link().
+  MyTab = mytab.
+  brick_simple:set_gh(node(), MyTab, GH_3_4).
+  brick_simple:get(MyTab, "foo1").
+  brick_simple:set(MyTab, "foo1", "Val 1 for foo1").
+  brick_simple:get(MyTab, "foo1").
+  brick_simple:get(MyTab, "foo2").
+
+
+brick_admin:create_new_schema([{bootstrap_copy2, node()}, {bootstrap_copy1, node()}], "Schema-Chain.test1").
+%% brick_admin:bootstrap_existing_schema("Schema-Chain.test1").
+%% brick_admin:start_link("Schema-Chain.test1").
+brick_admin:start("Schema-Chain.test1").
+
+brick_admin:create_new_schema([{bootstrap_copy3, 'test_down@newbb'}, {bootstrap_copy1, node()}, {bootstrap_copy2, node()}], "Schema-Chain.test2-down").
+  i:ii(brick_chainmon).
+  i:ib(brick_chainmon, process_brickstatus_diffs, 5).
+  im().
+brick_admin:start("Schema-Chain.test2-down").
+brick_server:status(tabX_ch2_b2, node()).
+{tabX_ch2_b2,brick_dev@newbb} ! chain_admin_periodic.
+
+brick_admin:get_tables(brick_admin).
+Ch1s = [{tab1_ch1, [{tab1_ch1_hd, node()}]}].
+brick_admin:add_table(tab2, Ch1s, tab1_lhash, tab1_ghash).
+  brick_bp:state(pinger_tab1_ch1_hd).
+  brick_shepherd:stop_brick(tab1_ch1_hd).
+Ch2s = [{tab2_ch1, [{tab2_ch1_hd, 'test_down@newbb'}]}].
+brick_admin:add_table(tab2, Ch2s, tab2_lhash, tab2_ghash).
+Ch3s = [{tab3_ch1, [{tab3_ch1_hd, node()}, {tab3_ch1_tl, 'test_down@newbb'}]}].
+brick_admin:add_table(tab3, Ch3s, tab3_lhash, tab3_ghash).
+Ch4s = [{tab4_ch1, [{tab4_ch1_hd, node()}, {tab4_ch1_mid1, 'test_down@newbb'}, {tab4_ch1_mid2, node()}, {tab4_ch1_tl, 'test_down@newbb'}]}].
+brick_admin:add_table(tab4, Ch4s).
+Ch5s = brick_admin:make_chain_description(tab5, 2, [brick_dev@newbb, test_down@newbb]).
+brick_admin:add_table(tab5, brick_admin:make_chain_description(tab5, 2, [brick_dev@newbb, test_down@newbb])).
+  brick_admin:hack_all_tab_setup(tabX, 2, [node(), node()], [{zzz_foo, bar}]).
+  brick_simple:set(tabX, <<"Scott1">>, foo).
+  brick_simple:set(tabX, <<"Scott2">>, foo).
+  brick_simple:set(tabX, <<"Scott4">>, foo).
+  [brick_simple:set(tabX, list_to_binary("Scott" ++ integer_to_list(X)), foo) || X <- lists:seq(1,100)].
+  [brick_server:set_do_sync(X, false) || X <- [tabX_ch1_b1, tabX_ch1_b2, tabX_ch2_b1, tabX_ch2_b2]].
+  brick_simple:set(tabX, <<"aScott1">>, bar).
+  brick_simple:set(tabX, <<"zScott1">>, bar).
+  brick_simple:set(tabX, <<"~Scott1">>, bar).
+  brick_simple:set(tabX, <<"~Scott2">>, bar).
+  brick_simple:set(tabX, <<"~Scott3">>, bar).
+  brick_simple:set(tabX, <<"~Scott4">>, bar).
+  brick_simple:get_many(tabX, <<"Scott">>, 10).
+  brick_simple:get_many(tabX, <<"Scott">>, 10, [{binary_prefix, <<"Sc">>}]).
+
+
+io:format(brick_sb:dump_status()).
+brick_server:set(tab5_ch1_b1,brick_dev@newbb, 1, "val of 1").
+
+io:format(brick_sb:dump_history({brick,{tab1_ch1_hd,brick_dev@newbb}}, 15)).
+io:format(brick_sb:dump_history({brick,{tab2_ch1_hd, 'test_down@newbb'}}, 15)).
+dbgon(brick_chainmon, process_brickstatus_diffs).
+dbgon(brick_squorum).
+dbgadd(brick_server).
+dbgadd(brick_sb).
+dbgadd(brick_chainmon).
+dbgadd(brick_admin).
+dbgadd(brick_shepherd).
+brick_test0:chain_t35().
+l(brick_test0).
+l(brick_squorum).
+
+dbgon(brick_admin, fix_bad_bootstrap_done).
+dbgadd(brick_admin, fix_bad_bootstrap_replica).
+dbgadd(brick_server, do).
+
+erl -pz ../ebin -pz ../../../erl-apps/gmt-util__HEAD/ebin -sname test_down -central_config ../priv/central.conf -eval 'application:start(sasl).' -eval 'application:start(brick).'
+
+Br4 = [{tab4_ch1_hd,brick_dev@newbb}, {tab4_ch1_mid1,test_down@newbb}, {tab4_ch1_mid2,brick_dev@newbb}, {tab4_ch1_tl,test_down@newbb}].
+[{rpc:call(Nd, brick_shepherd, stop_brick, [Br])} || {Br, Nd} <- tl(tl(Br4))].
+[{spawn(fun() -> rpc:call(Nd, brick_shepherd, stop_brick, [Br]) end)} || {Br, Nd} <- lists:sublist(lists:sort(fun(_, _) -> random:uniform(100) < 50 end, Br4), random:uniform(4))].
+
+ChainGrp = brick_hash:invent_nodelist(1, 4, node(), 98).
+brick_test0:chain_start_entire_chain(hd(ChainGrp), [], true).
+Bs = element(2, hd(ChainGrp)).
+[{B1,N1}, {B2,N2}, {B3,N3}, {B4,N4}] = Bs.
+brick_server:status(B1,N1).
+brick_server:status(B4,N4).
+brick_server:status(B5,N5).
+brick_server:delete(B1,N1, 'SADFLKJSADFKLJsadfkljasdflkjasdf').
+brick_server:sync_down_the_chain(B1,N1, []).
+  {B5, N5} = {test_ch98_newtail, brick_dev@newbb}.
+  rpc:call(N5, brick_shepherd, start_brick, [B5, []]).
+  brick_server:chain_role_tail(B5, N5, B4, N4, [{official_tail, false}]).
+  brick_server:chain_role_middle(B4, N4, B3, N3, B5, N5, [{official_tail, true}]).
+  brick_server:chain_start_repair(B4, N4).
+    dbgon(brick_server, chain_send_downstream).
+    brick_server:set(B1,N1, 'SADFLKJSADFKLJsadfkljasdflkjasdf', foo).
+brick_server:status(B4,N4).
+brick_server:status(B5,N5).
+
+[brick_server:start_link(Br, []) || Br <- [foo, foo2]].
+[brick_server:chain_role_standalone(Br, node()) || Br <- [foo, foo2]].
+[brick_server:migration_start_sweep(Br, node(), []) || Br <- [foo, foo2]].
+brick_server:chain_set_my_repair_state(Br, node(), ok) || Br <- [foo, foo2]].
+brick_server:set(foo, node(), foo, foo1).
+brick_server:set(foo, node(), bar, bar1).
+brick_server:set(foo, node(), baz, baz1).
+brick_server:set(foo, node(), zoo, zoo1).
+brick_server:migration_start_sweep(foo, node(), []).    
+
+ChList20 = brick_hash:invent_nodelist(2, 1, node(), 20).
+[Ch20, Ch21] = ChList20.
+{Chain20, [{Brick20, Node20}]} = Ch20.
+{Chain21, [{Brick21, Node21}]} = Ch21.
+[brick_server:start_link(Br, []) || Br <- [Brick20, Brick21]].
+[brick_server:chain_role_standalone(Br, node()) || Br <- [Brick20, Brick21]].
+[brick_server:chain_set_my_repair_state(Br, node(), ok) || Br <- [Brick20, Brick21]].
+LHcur = brick_hash:naive_init([Ch20]).
+GHcur = brick_hash:init_global_hash_state(false, unused, 1, LHcur, [Ch20], LHcur, [Ch20]).
+[brick_server:chain_hack_set_global_hash(Br, node(), GHcur) || Br <- [Brick20, Brick21]].
+KVs = [{foo, foo1}, {bar, bar1}, {baz, baz1}, {zoo, zoo1}].
+[brick_server:delete(Brick21, node(), K) || {K, V} <- KVs].
+[brick_server:add(Brick20, node(), K, V) || {K, V} <- KVs].
+LHnew = brick_hash:naive_init(ChList20).
+GHmig = brick_hash:init_global_hash_state(true, unused, 1, LHcur, [Ch20], LHnew, ChList20).
+[brick_server:chain_hack_set_global_hash(Br, node(), GHmig) || Br <- [Brick20, Brick21]].
+brick_server:migration_start_sweep(Brick20, node(), Chain20, []).
+brick_server:migration_start_sweep(Brick21, node(), Chain21, []).
+  brick_server:get_many(Brick20, node(), '$start_of_table', 50).
+  brick_server:get_many(Brick21, node(), '$start_of_table', 50).
+  brick_server:get(Brick20, node(), foo).
+  brick_server:get(Brick21, node(), foo).
+
+%%% bb2-2 demo stuff
+
+brick_admin:create_new_schema([{bootstrap_copy1, 'brick_dev@bb2-2'}, {bootstrap_copy2, 'vm1@bb2-2'}, {bootstrap_copy3, 'vm2@bb2-2'}], "Schema-Chain.bb2-2").
+brick_admin:start("Schema-Chain.bb2-2").
+Ch1s = [{tab1_ch1, [{tab1_ch1_hd, 'brick_dev@bb2-2'}, {tab1_ch1_mid1, 'vm1@bb2-2'}, {tab1_ch1_tl, 'vm2@bb2-2'}]}].
+brick_admin:add_table(tab2, Ch1s).
+  brick_bp:state(pinger_tab1_ch1_hd).
+  brick_shepherd:stop_brick(tab1_ch1_hd).
+
+%% First time setupgdata_dir, BigDataDir}:
+
+brick_admin:create_new_schema([{bootstrap_copy1, node()}], "Schema-Chain.test1").
+brick_admin:start("Schema-Chain.test1").
+brick_admin:hack_all_tab_setup(tab1, 1, [node(), node()], [], true).
+brick_admin:start("Schema-Chain.test1").
+brick_admin:hack_all_tab_setup(tab1, 1, [node(), node()], [], false).
+[brick_server:set_do_sync(X, false) || X <- [tab1_ch1_b1, tab1_ch2_b1]].
+[brick_server:checkpoint(X, node(), [{old_logs, {rename, "./", ".KEEP1"}}]) || X <- [tab1_ch1_b1, tab1_ch2_b1]].
+
+% 2007-12-21
+% Steps to verify that the bigdata_dir feature works: the ETS
+% table does not contains real val terms.
+
+brick_admin:create_new_schema([{bootstrap_copy1, node()}], "Schema-Chain.test1").
+brick_admin:start("Schema-Chain.test1").
+brick_admin:hack_all_tab_setup(tab1, 1, [node(), node()], [{bigdata_dir, "./tab1-bigdata-dir"}], true).
+brick_server:status(tab1_ch1_b1, node()).
+	bigdata_dir should appear in implementation's options proplist!
+[brick_simple:set(tab1, list_to_binary("Scott" ++ integer_to_list(X)), <<"This value should reside only on disk.">>) || X <- lists:seq(1,10)].
+ets:tab2list(tab1_ch1_b1_store).
+[brick_simple:get(tab1, list_to_binary("Scott" ++ integer_to_list(X))) || X <- lists:seq(1,10)].
+
+% 2008-01-08
+% Setting up a cluster of nodes & chains, using the variable prefix method.
+% The only difference to prior calls to hack_all_tab_setup() is a new 6th
+% arg to specify the (opaque) local hash structure init function.
+
+brick_admin:hack_all_tab_setup(tabVar, 1, [node(), node()], [], true, fun brick_hash:var_prefix_init/1).
+brick_simple:set(tabVar, "foo/bar", <<"Something bar">>).
+brick_simple:get(tabVar, "foo/bar").
+ok = brick_test0:chain_t20().
+ok = brick_test0:chain_t25().
+ok = brick_test0:chain_t30().
+ok = brick_test0:chain_t31().
+ok = brick_test0:chain_t40().
+ok = brick_test0:chain_t41().
+ok = brick_test0:single_brick_regression().
+  NOTE: single_brick_regression may fail if old *LOG files are lying around,
+	so if it fails, try it a 2nd time.
+brick_server:start_link(regression_test0, []).
+brick_server:chain_set_my_repair_state(regression_test0, node(), ok).
+brick_server:chain_role_standalone(regression_test0, node()).
+brick_test0:t50(regression_test0, node(), 50, true).
+brick_test0:t51(regression_test0, node(), 10, 10, true).
+%
+catch dbgon(asdflkj, asdf), dbgadd(brick_ets, bigdata_dir_store_val), dbgadd(brick_ets, bigdata_dir_delete_val), dbgadd(brick_ets, bigdata_dir_get_val), dbgadd(file, read_file), dbgadd(file, write_file), dbgadd(file, delete), dbgadd(file, rename).
+
+%%
+
+NameHead = ch1_head, NameTail = ch1_tail, Node = node().
+{ok, _} = brick_server:start_link(NameHead, []).
+{ok, _} = brick_server:start_link(NameTail, []).
+brick_server:chain_set_my_repair_state(NameTail, Node, undefined).
+brick_server:chain_role_tail(NameTail, Node, NameHead, Node, []).
+brick_server:chain_role_head(NameHead, Node, NameTail, Node, []).
+brick_server:chain_start_repair(NameHead, Node).
+brick_server:chain_start_repair(NameMiddle, Node).
+
+NameHead = ch1_head, NameMiddle = ch1_middle, NameTail = ch1_tail, Node = node().
+l(brick_server).
+{ok, _} = brick_server:start_link(NameHead, []).
+{ok, _} = brick_server:start_link(NameMiddle, []).
+{ok, _} = brick_server:start_link(NameTail, []).
+brick_server:chain_set_my_repair_state(NameMiddle, Node, undefined).
+brick_server:chain_set_my_repair_state(NameTail, Node, undefined).
+brick_server:chain_set_my_repair_state(NameHead, Node, ok).
+brick_server:chain_role_tail(NameTail, Node, NameMiddle, Node, []).
+brick_server:chain_role_middle(NameMiddle, Node, NameHead, Node, NameTail, Node, []).
+brick_server:chain_role_head(NameHead, Node, NameMiddle, Node, []).
+brick_server:chain_start_repair(NameHead, Node).
+brick_server:chain_start_repair(NameMiddle, Node).
+
+BLstand = brick_hash:invent_nodelist(2, 1, node(), 0).
+[brick_test0:chain_start_entire_chain(C, [], true) || C <- BLstand].
+[brick_test0:chain_start_entire_chain(C, [], true) || C <- brick_hash:invent_nodelist(2, 2, node(), 0)].
+
+  Chains_1_4 = brick_hash:invent_nodelist(1, 4, node(), 0).
+  LH_1_4 = brick_hash:naive_init(Chains_1_4).
+  GH_1_4 = brick_hash:init_global_hash_state(false, unused, 1, LH_1_4, unused, 1, LH_1_4, unused, Chains_1_4).
+  [brick_test0:chain_start_entire_chain(C, []) || C <- Chains_1_4].
+  [ brick_server:chain_hack_set_global_hash(Br, Nd, GH_1_4) || {Br, Nd} <- lists:append([List || {_, List} <- Chains_1_4]) ].
+  brick_server:get(test_ch0_head, node(), "foo1").
+  brick_server:get(test_ch0_middle1, node(), "foo1").
+  brick_server:get(test_ch0_middle2, node(), "foo1").
+  brick_server:get(test_ch0_tail, node(), "foo1").
+  brick_server:set(test_ch0_middle1, node(), "foo1", "New3 val").
+  brick_server:set(test_ch0_middle2, node(), "foo1", "New4 val").
+  brick_server:set(test_ch0_tail, node(), "foo1", "New5 val").
+
+
+  Chains_3_4 = brick_hash:invent_nodelist(3, 4, node(), 0).
+  LH_3_4 = brick_hash:naive_init(Chains_3_4).
+  GH_3_4 = brick_hash:init_global_hash_state(false, unused, 1, LH_3_4, unused, 1, LH_3_4, unused, Chains_3_4).
+  [brick_test0:chain_start_entire_chain(C, []) || C <- Chains_3_4].
+  [ brick_server:chain_hack_set_global_hash(Br, Nd, GH_3_4) || {Br, Nd} <- lists:append([List || {_, List} <- Chains_3_4]) ].
+
+  brick_simple:start_link().
+  MyTab = mytab.
+  brick_simple:set_gh(node(), MyTab, GH_3_4).
+  brick_simple:get(MyTab, "foo1").
+  brick_simple:set(MyTab, "foo1", "Val 1 for foo1").
+  brick_simple:get(MyTab, "foo1").
+  brick_simple:get(MyTab, "foo2").
+
+
+brick_admin:create_new_schema([{bootstrap_copy2, node()}, {bootstrap_copy1, node()}], "Schema-Chain.test1").
+%% brick_admin:bootstrap_existing_schema("Schema-Chain.test1").
+%% brick_admin:start_link("Schema-Chain.test1").
+brick_admin:start("Schema-Chain.test1").
+
+brick_admin:create_new_schema([{bootstrap_copy3, 'test_down@newbb'}, {bootstrap_copy1, node()}, {bootstrap_copy2, node()}], "Schema-Chain.test2-down").
+  i:ii(brick_chainmon).
+  i:ib(brick_chainmon, process_brickstatus_diffs, 5).
+  im().
+brick_admin:start("Schema-Chain.test2-down").
+brick_server:status(tabX_ch2_b2, node()).
+{tabX_ch2_b2,brick_dev@newbb} ! chain_admin_periodic.
+
+brick_admin:get_tables(brick_admin).
+Ch1s = [{tab1_ch1, [{tab1_ch1_hd, node()}]}].
+brick_admin:add_table(tab2, Ch1s, tab1_lhash, tab1_ghash).
+  brick_bp:state(pinger_tab1_ch1_hd).
+  brick_shepherd:stop_brick(tab1_ch1_hd).
+Ch2s = [{tab2_ch1, [{tab2_ch1_hd, 'test_down@newbb'}]}].
+brick_admin:add_table(tab2, Ch2s, tab2_lhash, tab2_ghash).
+Ch3s = [{tab3_ch1, [{tab3_ch1_hd, node()}, {tab3_ch1_tl, 'test_down@newbb'}]}].
+brick_admin:add_table(tab3, Ch3s, tab3_lhash, tab3_ghash).
+Ch4s = [{tab4_ch1, [{tab4_ch1_hd, node()}, {tab4_ch1_mid1, 'test_down@newbb'}, {tab4_ch1_mid2, node()}, {tab4_ch1_tl, 'test_down@newbb'}]}].
+brick_admin:add_table(tab4, Ch4s).
+Ch5s = brick_admin:make_chain_description(tab5, 2, [brick_dev@newbb, test_down@newbb]).
+brick_admin:add_table(tab5, brick_admin:make_chain_description(tab5, 2, [brick_dev@newbb, test_down@newbb])).
+  brick_admin:hack_all_tab_setup(tabX, 2, [node(), node()], [{zzz_foo, bar}]).
+  brick_simple:set(tabX, <<"Scott1">>, foo).
+  brick_simple:set(tabX, <<"Scott2">>, foo).
+  brick_simple:set(tabX, <<"Scott4">>, foo).
+  [brick_simple:set(tabX, list_to_binary("Scott" ++ integer_to_list(X)), foo) || X <- lists:seq(1,100)].
+  [brick_server:set_do_sync(X, false) || X <- [tabX_ch1_b1, tabX_ch1_b2, tabX_ch2_b1, tabX_ch2_b2]].
+  brick_simple:set(tabX, <<"aScott1">>, bar).
+  brick_simple:set(tabX, <<"zScott1">>, bar).
+  brick_simple:set(tabX, <<"~Scott1">>, bar).
+  brick_simple:set(tabX, <<"~Scott2">>, bar).
+  brick_simple:set(tabX, <<"~Scott3">>, bar).
+  brick_simple:set(tabX, <<"~Scott4">>, bar).
+  brick_simple:get_many(tabX, <<"Scott">>, 10).
+  brick_simple:get_many(tabX, <<"Scott">>, 10, [{binary_prefix, <<"Sc">>}]).
+
+
+io:format(brick_sb:dump_status()).
+brick_server:set(tab5_ch1_b1,brick_dev@newbb, 1, "val of 1").
+
+io:format(brick_sb:dump_history({brick,{tab1_ch1_hd,brick_dev@newbb}}, 15)).
+io:format(brick_sb:dump_history({brick,{tab2_ch1_hd, 'test_down@newbb'}}, 15)).
+dbgon(brick_chainmon, process_brickstatus_diffs).
+dbgon(brick_squorum).
+dbgadd(brick_server).
+dbgadd(brick_sb).
+dbgadd(brick_chainmon).
+dbgadd(brick_admin).
+dbgadd(brick_shepherd).
+brick_test0:chain_t35().
+l(brick_test0).
+l(brick_squorum).
+
+dbgon(brick_admin, fix_bad_bootstrap_done).
+dbgadd(brick_admin, fix_bad_bootstrap_replica).
+dbgadd(brick_server, do).
+
+erl -pz ../ebin -pz ../../../erl-apps/gmt-util__HEAD/ebin -sname test_down -central_config ../priv/central.conf -eval 'application:start(sasl).' -eval 'application:start(brick).'
+
+Br4 = [{tab4_ch1_hd,brick_dev@newbb}, {tab4_ch1_mid1,test_down@newbb}, {tab4_ch1_mid2,brick_dev@newbb}, {tab4_ch1_tl,test_down@newbb}].
+[{rpc:call(Nd, brick_shepherd, stop_brick, [Br])} || {Br, Nd} <- tl(tl(Br4))].
+[{spawn(fun() -> rpc:call(Nd, brick_shepherd, stop_brick, [Br]) end)} || {Br, Nd} <- lists:sublist(lists:sort(fun(_, _) -> random:uniform(100) < 50 end, Br4), random:uniform(4))].
+
+ChainGrp = brick_hash:invent_nodelist(1, 4, node(), 98).
+brick_test0:chain_start_entire_chain(hd(ChainGrp), [], true).
+Bs = element(2, hd(ChainGrp)).
+[{B1,N1}, {B2,N2}, {B3,N3}, {B4,N4}] = Bs.
+brick_server:status(B1,N1).
+brick_server:status(B4,N4).
+brick_server:status(B5,N5).
+brick_server:delete(B1,N1, 'SADFLKJSADFKLJsadfkljasdflkjasdf').
+brick_server:sync_down_the_chain(B1,N1, []).
+  {B5, N5} = {test_ch98_newtail, brick_dev@newbb}.
+  rpc:call(N5, brick_shepherd, start_brick, [B5, []]).
+  brick_server:chain_role_tail(B5, N5, B4, N4, [{official_tail, false}]).
+  brick_server:chain_role_middle(B4, N4, B3, N3, B5, N5, [{official_tail, true}]).
+  brick_server:chain_start_repair(B4, N4).
+    dbgon(brick_server, chain_send_downstream).
+    brick_server:set(B1,N1, 'SADFLKJSADFKLJsadfkljasdflkjasdf', foo).
+brick_server:status(B4,N4).
+brick_server:status(B5,N5).
+
+[brick_server:start_link(Br, []) || Br <- [foo, foo2]].
+[brick_server:chain_role_standalone(Br, node()) || Br <- [foo, foo2]].
+[brick_server:migration_start_sweep(Br, node(), []) || Br <- [foo, foo2]].
+brick_server:chain_set_my_repair_state(Br, node(), ok) || Br <- [foo, foo2]].
+brick_server:set(foo, node(), foo, foo1).
+brick_server:set(foo, node(), bar, bar1).
+brick_server:set(foo, node(), baz, baz1).
+brick_server:set(foo, node(), zoo, zoo1).
+brick_server:migration_start_sweep(foo, node(), []).    
+
+ChList20 = brick_hash:invent_nodelist(2, 1, node(), 20).
+[Ch20, Ch21] = ChList20.
+{Chain20, [{Brick20, Node20}]} = Ch20.
+{Chain21, [{Brick21, Node21}]} = Ch21.
+[brick_server:start_link(Br, []) || Br <- [Brick20, Brick21]].
+[brick_server:chain_role_standalone(Br, node()) || Br <- [Brick20, Brick21]].
+[brick_server:chain_set_my_repair_state(Br, node(), ok) || Br <- [Brick20, Brick21]].
+LHcur = brick_hash:naive_init([Ch20]).
+GHcur = brick_hash:init_global_hash_state(false, unused, 1, LHcur, [Ch20], LHcur, [Ch20]).
+[brick_server:chain_hack_set_global_hash(Br, node(), GHcur) || Br <- [Brick20, Brick21]].
+KVs = [{foo, foo1}, {bar, bar1}, {baz, baz1}, {zoo, zoo1}].
+[brick_server:delete(Brick21, node(), K) || {K, V} <- KVs].
+[brick_server:add(Brick20, node(), K, V) || {K, V} <- KVs].
+LHnew = brick_hash:naive_init(ChList20).
+GHmig = brick_hash:init_global_hash_state(true, unused, 1, LHcur, [Ch20], LHnew, ChList20).
+[brick_server:chain_hack_set_global_hash(Br, node(), GHmig) || Br <- [Brick20, Brick21]].
+brick_server:migration_start_sweep(Brick20, node(), Chain20, []).
+brick_server:migration_start_sweep(Brick21, node(), Chain21, []).
+  brick_server:get_many(Brick20, node(), '$start_of_table', 50).
+  brick_server:get_many(Brick21, node(), '$start_of_table', 50).
+  brick_server:get(Brick20, node(), foo).
+  brick_server:get(Brick21, node(), foo).
+
+%%% bb2-2 demo stuff
+
+brick_admin:create_new_schema([{bootstrap_copy1, 'brick_dev@bb2-2'}, {bootstrap_copy2, 'vm1@bb2-2'}, {bootstrap_copy3, 'vm2@bb2-2'}], "Schema-Chain.bb2-2").
+brick_admin:start("Schema-Chain.bb2-2").
+Ch1s = [{tab1_ch1, [{tab1_ch1_hd, 'brick_dev@bb2-2'}, {tab1_ch1_mid1, 'vm1@bb2-2'}, {tab1_ch1_tl, 'vm2@bb2-2'}]}].
+brick_admin:add_table(tab2, Ch1s).
+  brick_bp:state(pinger_tab1_ch1_hd).
+  brick_shepherd:stop_brick(tab1_ch1_hd).
+
+%% First time setupgdata_dir, BigDataDir}:
+
+brick_admin:create_new_schema([{bootstrap_copy1, node()}], "Schema-Chain.test1").
+brick_admin:start("Schema-Chain.test1").
+brick_admin:hack_all_tab_setup(tab1, 1, [node(), node()], [], true).
+brick_admin:start("Schema-Chain.test1").
+brick_admin:hack_all_tab_setup(tab1, 1, [node(), node()], [], false).
+[brick_server:set_do_sync(X, false) || X <- [tab1_ch1_b1, tab1_ch2_b1]].
+[brick_server:checkpoint(X, node(), [{old_logs, {rename, "./", ".KEEP1"}}]) || X <- [tab1_ch1_b1, tab1_ch2_b1]].
+
+% 2007-12-21
+% Steps to verify that the bigdata_dir feature works: the ETS
+% table does not contains real val terms.
+
+brick_admin:create_new_schema([{bootstrap_copy1, node()}], "Schema-Chain.test1").
+brick_admin:start("Schema-Chain.test1").
+brick_admin:hack_all_tab_setup(tab1, 1, [node(), node()], [{bigdata_dir, "./tab1-bigdata-dir"}], true).
+  rr("../include/brick_hash.hrl").
+  rr("./brick_admin.erl").
+  rr("./brick_hash.erl").
+  brick_admin:change_chain_length(tab1_ch1, [{foo, node()}]).
+  brick_admin:change_chain_length(tab1_ch1, [{tab1_ch1_b1, node()}, {tab1_ch1_newbrick, node()}]).
+
+brick_server:status(tab1_ch1_b1, node()).
+	bigdata_dir should appear in implementation's options proplist!
+[brick_simple:set(tab1, list_to_binary("Scott" ++ integer_to_list(X)), <<"This value should reside only on disk.">>) || X <- lists:seq(1,10)].
+ets:tab2list(tab1_ch1_b1_store).
+[brick_simple:get(tab1, list_to_binary("Scott" ++ integer_to_list(X))) || X <- lists:seq(1,10)].
+
+% 2008-01-08
+% Setting up a cluster of nodes & chains, using the variable prefix method.
+% The only difference to prior calls to hack_all_tab_setup() is a new 6th
+% arg to specify the (opaque) local hash structure init function.
+
+brick_admin:hack_all_tab_setup(tabVar, 1, [node(), node()], [], true, fun brick_hash:var_prefix_init/1).
+brick_simple:set(tabVar, "foo/bar", <<"Something bar">>).
+brick_simple:get(tabVar, "foo/bar").
+
+% 2008-01-15
+% Basic migration testing.
+
+% Start bricks running & populate with 104 keys. Migrate to view 1.
+brick_test0:exp0(true, 1, []).
+[brick_server:migration_clear_sweep(B, node()) || B <- [test_ch20_stand,test_ch21_stand]].
+% Use existing brick procs, migrate to view 2.  Migrate back to view 1.
+brick_test0:exp0(false, 2, []).
+{ets:info(test_ch20_stand_store, size), ets:info(test_ch21_stand_store, size)}.
+brick_test0:exp0(false, 1, []).
+{ets:info(test_ch20_stand_store, size), ets:info(test_ch21_stand_store, size)}.
+%
+brick_test0:exp0(false, 2, [{artificial_propagation_delay, 900}]).
+
+brick_admin:hack_all_tab_setup(tabd, 1, ['brick_dev@bb2e', 'brick_dev@old-snookles', 'brick_dev@tree'], [], true).
+brick_admin:hack_all_tab_setup(tabd, 1, ['brick_dev@bb2e', 'brick_dev@old-snookles', 'brick_dev@tree'], [{bigdata_dir, "./tab1-bigdata-dir"}], true).
+brick_admin:hack_all_tab_setup(tabd, 1, ['brick_dev@bb2e', 'brick_dev@old-snookles', 'brick_dev@tree'], [{do_sync, false}], true).
+  brick_admin:hack_all_tab_setup(tabd, 1, ['bd@tkqa-464-3', 'bd@tkqa-464-4', 'bd@tkqa-464-5', 'bd@tkqa-464-6'], [{do_sync, false}], true).
+
+%%
+brick_admin:create_new_schema([{bootstrap_copy1, node()}], "Schema-Chain.test1").
+brick_admin:start("Schema-Chain.test1").
+brick_admin:add_table(tab1, [{tab1ch1, [{tab1ch1b1, node()}]}, {tab1ch2, [{tab1ch2b1, node()}]}], [{hash_init, fun brick_hash:fixed_prefix_init/3}, {prefix_is_integer_hack, true}]).
+  brick_admin:change_chain_length(tab1ch1, [{tab1ch1b1,'brick_dev@bb2-2'}, {tab1ch1b2,'brick_dev@bb2-2'}, {tab1ch1b2,'brick_dev@bb2-2'}]).
+brick_admin:add_table(tab2, [{tab2ch1, [{tab2ch1b1, node()}]}, {tab2ch2, [{tab2ch2b1, node()}]}], [{hash_init, fun brick_hash:fixed_prefix_init/3}, {prefix_is_integer_hack, false}]).
+[brick_simple:set(tab1, list_to_binary("000" ++ integer_to_list(X) ++ "." ++ integer_to_list(X)), <<"Val for tab1">>) || X <- lists:seq(0,9)].
+
+LH1 = brick_hash:naive_init([{tab1_newch1, [{tab1_newch1b1, node()}]}]).
+brick_admin:start_migration(tab1, LH1).
+LH1b = brick_hash:naive_init([{tab1_newch1b, [{tab1_newch1b1b, node()}]}]).
+brick_admin:start_migration(tab1, LH1b).
+LH1c = brick_hash:naive_init([{tab1_newch1c, [{tab1_newch1b1c, node()}]}]).
+brick_admin:start_migration(tab1, brick_hash:naive_init(brick_admin:make_chain_description(tab1, 1, lists:duplicate(1, node())))).
+%% [brick_server:migration_start_sweep(Br, Nd, foocookie, Ch, []) || {Br, Nd, Ch} <- [{tab1ch1b1, node(), tab1ch1}, {tab1ch2b1, node(), tab1ch2}, {tab1_newch1b1, node(), tab1_newch1}]].
+  brick_admin:start("Schema.local").
+  eqc:quickcheck(eqc:numtests(300, simple_qc:prop_simple1())).
+  gmt_loop:tc(fun() -> [{ io:format("1"), brick_admin:change_chain_length(tab1_ch1, [{tab1_ch1_b1, node()}]), timer:sleep(4*1000), io:format("2"), brick_admin:change_chain_length(tab1_ch1, [{tab1_ch1_b1, node()}, {tab1_ch1_b2, node()}]), timer:sleep(10*1000)} || _ <- lists:seq(1,1*8)] end).
+  Fm = fun(N) -> brick_admin:start_migration(tab1, brick_hash:naive_init(brick_admin:make_chain_description(tab1, 1, lists:duplicate(N, node())))) end.
+  [{io:format("x"), Fm(1), timer:sleep(9000), Fm(4), timer:sleep(12000)} || _ <- lists:seq(1,50)].
+  timing for 2*8 iters of change_chain_length above: 377.65 seconds.
+  timing for 1*5 iters of 1->4 chains above: 105.4 seconds.
+  timing for 300 iters of quickcheck with 10 vs 1 frequencies, change_chain_length happening: 490 seconds.
+
+%% Testing migration + consistent hashing: 10 Sep 2008
+
+CL_2 = [{tabX_ch1, [{tabX_ch1_b1, node()}]}, {tabX_ch2, [{tabX_ch2_b1, node()}]}].
+LH_2 = brick_hash:chash_init(via_proplist, CL_2, [{prefix_method, var_prefix}, {prefix_separator, $/}, {new_chainweights, [{tabX_ch1,100}, {tabX_ch2, 100}]}]).
+brick_admin:start_migration(tabX, LH_2).
+
+CL_4 = [{tabX_ch1, [{tabX_ch1_b1, node()}]}, {tabX_ch2, [{tabX_ch2_b1, node()}]}, {tabX_ch3, [{tabX_ch3_b1, node()}]}, {tabX_ch4, [{tabX_ch4_b1, node()}]}].
+LH_4_fromscratch = brick_hash:chash_init(via_proplist, CL_4, [{prefix_method, var_prefix}, {prefix_separator, $/}, {new_chainweights, [{tabX_ch1,100}, {tabX_ch2, 100}, {tabX_ch3,200}, {tabX_ch4, 200}]}]).
+brick_admin:start_migration(tabX, LH_4_fromscratch).
+
+CL_1 = [{tabX_ch1, [{tabX_ch1_b1, node()}]}].
+LH_1 = brick_hash:chash_init(via_proplist, CL_1, [{prefix_method, var_prefix}, {prefix_separator, $/}, {new_chainweights, [{tabX_ch1,100}]}]).
+brick_admin:start_migration(tabX, LH_1).
+
+CL_tab1_1 = [{tab1_ch1, [{tab1_ch1_b1, node()}]}].
+LH_tab1_1 = brick_hash:chash_init(via_proplist, CL_tab1_1, [{prefix_method, var_prefix}, {new_chainweights, [{tab1_ch1,100}]}]).
+CL_tab1_2 = [{tab1_ch1, [{tab1_ch1_b1, node()}]}, {tab1_ch2, [{tab1_ch2_b1, node()}]}].
+LH_tab1_2 = brick_hash:chash_init(via_proplist, CL_tab1_2, [{prefix_method, var_prefix}, {new_chainweights, [{tab1_ch1,100}, {tab1_ch2,100}]}]).
+CL_tab1_3 = [{tab1_ch1, [{tab1_ch1_b1, node()}]}, {tab1_ch2, [{tab1_ch2_b1, node()}]}, {tab1_ch3, [{tab1_ch3_b1, node()}]}].
+LH_tab1_3 = brick_hash:chash_init(via_proplist, CL_tab1_3, [{prefix_method, var_prefix}, {new_chainweights, [{tab1_ch1,100}, {tab1_ch2,100}, {tab1_ch3,100}]}]).
+CL_tab1_4 = [{tab1_ch1, [{tab1_ch1_b1, node()}]}, {tab1_ch2, [{tab1_ch2_b1, node()}]}, {tab1_ch3, [{tab1_ch3_b1, node()}]}, {tab1_ch4, [{tab1_ch4_b1, node()}]}].
+LH_tab1_4 = brick_hash:chash_init(via_proplist, CL_tab1_4, [{prefix_method, var_prefix}, {new_chainweights, [{tab1_ch1,100}, {tab1_ch2,100}, {tab1_ch3,100}, {tab1_ch4,100}]}]).
+LH_tab1_4b = brick_hash:chash_init(via_proplist, CL_tab1_4, [{prefix_method, var_prefix}, {new_chainweights, [{tab1_ch1,10}, {tab1_ch2,100}, {tab1_ch3,100}, {tab1_ch4,100}]}]).
+
+[brick_simple:set(tab1, "foo"++ integer_to_list(N), lists:flatten(io_lib:format("Value for N = ~p: ~p\n", [N, now()]))) || N <- lists:seq(1,1000)].
+brick_simple:chash_migration_pre_check(tab1, LH_tab1_4).
+brick_admin:start_migration(tab1, LH_tab1_2).
+brick_admin:start_migration(tab1, LH_tab1_4).
+
+f(GH0). f(FloatMap_x). f(LH_tab1_y).
+{ok, _, GH0} = brick_simple:get_gh(tab1).
+FloatMap_x = brick_hash:chash_extract_new_float_map(GH0).
+LH_tab1_y = brick_hash:chash_init(via_proplist, CL_tab1_4, [{prefix_method, var_prefix}, {old_float_map, FloatMap_x}, {new_chainweights, [{tab1_ch1,100}, {tab1_ch2,100}, {tab1_ch3,100}, {tab1_ch4,100}]}]).
+brick_simple:chash_migration_pre_check(tab1, LH_tab1_y).
+
+CL_tab1_1 = [{tab1_ch1, [{tab1_ch1_b1, node()}]}].
+LH_tab1_1 = brick_hash:chash_init(via_proplist, CL_tab1_1, [{prefix_method, var_prefix}, {new_chainweights, [{tab1_ch1,100}]}]).
+
+brick_admin:change_chain_length(tab1_ch1, [{tab1_ch1_b1, node()}]).
+brick_admin:change_chain_length(tab1_ch1, [{tab1_ch1_b1, node()}, {tab1_ch1_b2, node()}]).
+brick_admin:change_chain_length(tab1_ch1, [{tab1_ch1_b1, node()}, {tab1_ch1_b2, node()}, {tab1_ch1_b3, node()}]).
+
+---
+
+April 2009 migration testing, etc.
+
+brick_simple:set(mail_summ, "foo", "SLFSLFSLFxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx222").
+[brick_simple:set(mail_summ, "aaa"++integer_to_list(X), "valfoo") || X <- lists:seq(1,7)].
+brick_simple:get(mail_summ, "foo").
+rr("../../gdss__HEAD/include/gmt_hlog.hrl").
+brick_server:checkpoint(mail_summ_ch1_b1, node()).
+brick_simple:get_many(mail_summ, "", 10, [witness]).
+brick_server:stop(mail_summ_ch1_b1).
+brick_ets:debug_scan("hlog.mail_summ_ch1_b1").
+
+eqc:quickcheck(eqc:numtests(50, hlog_qc:prop_log(true))).
+C2 = binary_to_term(element(2, file:read_file("zzz.cmds"))).
+eqc:check(hlog_qc:prop_log(true), [C2]).
+hlog_qc:wal_fold(shortterm, "zzz-hlog-qc").
+hlog_qc:wal_fold(longterm, "zzz-hlog-qc").
+Counter3 = eqc:counterexample().
+file:write_file("zzz-counterexample.hlog.3", term_to_binary(Counter3)).
+
+brick_admin:get_client_monitor_list().
+brick_admin:add_client_monitor(node()).
+brick_admin:delete_client_monitor(node()).
+brick_admin:add_client_monitor(foo@bar).
+brick_admin:delete_client_monitor(foo@bar).
+brick_admin:run_client_monitor_procs().
+
+
+CL_tab1_1 = [{tab1_ch1, [{tab1_ch1_b1, node()}]}].
+LH_tab1_1 = brick_hash:chash_init(via_proplist, CL_tab1_1, [{prefix_method, var_prefix}, {new_chainweights, [{tab1_ch1,100}]}]).
+CL_tab1_2 = [{tab1_ch1, [{tab1_ch1_b1, node()}]}, {tab1_ch2, [{tab1_ch2_b1, node()}]}].
+LH_tab1_2 = brick_hash:chash_init(via_proplist, CL_tab1_2, [{prefix_method, var_prefix}, {new_chainweights, [{tab1_ch1,100}, {tab1_ch2,100}]}]).
+[brick_simple:set(tab1, "/foo" ++ integer_to_list(X), "val!") || X <- lists:seq(0,9)].
+dbgon(asdf).
+dbgadd(brick_server, sweep_move_or_keep).
+brick_admin:start_migration(tab1, LH_tab1_2).
+[brick_simple:find_the_brick(tab1, "/foo" ++ integer_to_list(X), write) || X <- lists:seq(0,9)].
+
+CL_tab1_5 = [{tab1_ch1, [{tab1_ch1_b1, node()}]}, {tab1_ch2, [{tab1_ch2_b1, node()}]}, {tab1_ch3, [{tab1_ch3_b1, node()}]}, {tab1_ch4, [{tab1_ch4_b1, node()}]}, {tab1_ch5, [{tab1_ch5_b1, node()}]}].
+LH_tab1_5 = brick_hash:chash_init(via_proplist, CL_tab1_5, [{prefix_method, var_prefix}, {new_chainweights, [{tab1_ch1,100}, {tab1_ch2,100}, {tab1_ch3,100}, {tab1_ch4,100}, {tab1_ch5,100}]}]).
+
+CL_tab1_1b = [{tab1_ch1, [{tab1_ch1_b1, node()}, {tab1_ch1_b2, node()}]}].
+LH_tab1_1b = brick_hash:chash_init(via_proplist, CL_tab1_1b, [{prefix_method, var_prefix}, {new_chainweights, [{tab1_ch1,100}]}]).
+CL_tab1_2b = [{tab1_ch1, [{tab1_ch1_b1, node()}, {tab1_ch1_b2, node()}]}, {tab1_ch2, [{tab1_ch2_b1, node()}, {tab1_ch2_b2, node()}]}].
+LH_tab1_2b = brick_hash:chash_init(via_proplist, CL_tab1_2b, [{prefix_method, var_prefix}, {new_chainweights, [{tab1_ch1,100},{tab1_ch2,100}]}]).
+CL_tab1_5b = [{tab1_ch1, [{tab1_ch1_b1, node()},{tab1_ch1_b2, node()}]}, {tab1_ch2, [{tab1_ch2_b1, node()}, {tab1_ch2_b2, node()}]}, {tab1_ch3, [{tab1_ch3_b1, node()}, {tab1_ch3_b2, node()}]}, {tab1_ch4, [{tab1_ch4_b1, node()},{tab1_ch4_b2, node()}]}, {tab1_ch5, [{tab1_ch5_b1, node()},{tab1_ch5_b2, node()}]}].
+LH_tab1_5b = brick_hash:chash_init(via_proplist, CL_tab1_5b, [{prefix_method, var_prefix}, {new_chainweights, [{tab1_ch1,100}, {tab1_ch2,100}, {tab1_ch3,100}, {tab1_ch4,100}, {tab1_ch5,100}]}]).
+
+Fcycle = fun() -> [begin X = brick_admin:start_migration(tab1, LH, [{max_keys_per_iter, random:uniform(5)}]), timer:sleep(444), X end || LH <- [LH_tab1_1, LH_tab1_2, LH_tab1_5]] end.
+gmt_loop:do_while(fun(X) -> Fcycle(), case whereis(eqc_locked) of undefined -> {false, X+1}; _ -> {true, X+1} end end, 0).
+%%
+Fcycle2 = fun() -> [begin X = brick_admin:start_migration(tab1, LH, [{max_keys_per_iter, random:uniform(5)}]), timer:sleep(444), X end || LH <- [LH_tab1_1b, LH_tab1_2b, LH_tab1_5b]] end.
+gmt_loop:do_while(fun(X) -> Fcycle2(), case whereis(eqc_locked) of undefined -> {false, X+1}; _ -> {true, X+1} end end, 0).
+brick_server:checkpoint(bootstrap_copy1, node()).
+
+%% HRM, use the prop_simple1_noproc_ok for data migration tests also??
+{eqc:start(), timer:tc(eqc,quickcheck,[eqc:numtests(150, eqc_gen:noshrink(simple_qc:prop_simple1_noproc_ok()))]), file:write_file("zzz.eqc-counterexample", term_to_binary(catch eqc:counterexample())), eqc:stop(), catch exit(whereis(eqc_locked), kill)}.
+%%
+{eqc:start(), timer:tc(eqc,quickcheck,[eqc:numtests(150, eqc_gen:noshrink(simple_qc:prop_simple1()))]), file:write_file("zzz.eqc-counterexample", term_to_binary(catch eqc:counterexample())), eqc:stop(), catch exit(whereis(eqc_locked), kill)}.
+
+FUBAR: gmt_elog:add_match_spec(dbg:fun2ms(fun([_, _, _, _, _, Arg]) when element(1,Arg) == bootstrap_copy1;element(2,Arg) == bootstrap_copy1;element(3,Arg) == bootstrap_copy1 -> get_tcw(); ([_, _, _, _, _, _]) -> return_trace() end)).
+FUBAR: gmt_elog:add_match_spec(dbg:fun2ms(fun([_, _, _, _, _, Arg]) when is_tuple(Arg) andalso (size(Arg) >= 1 andalso element(1,Arg) /= bootstrap_copy1) andalso (size(Arg) >= 2 andalso element(2,Arg) /= bootstrap_copy) andalso (size(Arg) >= 3 andalso element(3,Arg) == bootstrap_copy1) -> return_trace() end)).
+
+gmt_elog:stop_tracing().
+gmt_elog:start_tracing("./zzz.trace").
+gmt_elog:add_match_spec(dbg:fun2ms(fun([_, _, _, _, _, _]) -> return_trace() end)).
+gmt_elog:stop_tracing().
+gmt_elog:format_file("zzz.trace", "zzz.trace.out").
+
+[brick_simple:set(tab1, "/ram"++integer_to_list(X), "RAM!", [value_in_ram]) || X <- lists:seq(1,20)].
+[brick_simple:set(tab1, "/disk"++integer_to_list(X), "disk", []) || X <- lists:seq(1,20)].
+[ begin timer:sleep(3600*1000), gmt_elog:stop_tracing(), os:cmd("mv ./zzz.trace ./zzz.trace.rot"++integer_to_list(X)), gmt_elog:start_tracing("./zzz.trace"), gmt_elog:add_match_spec(dbg:fun2ms(fun([_, _, _, _, _, _]) -> return_trace() end)), os:cmd("gzip -9 zzz.trace.rot*") end || X <- lists:seq(1,9) ].
+
+%%% disk_error testing
+
+brick_server:chain_set_my_repair_state(tab1_ch2_b2, node(), pre_init).
+brick_chainmon:force_best_first_brick(tab1_ch2, tab1_ch2_b2, node()).
+[brick_simple:set(tab1, "foo"++integer_to_list(X), "foo!!!") || X <- lists:seq(1,100)].
+gmt_hlog:advance_seqnum(commonLogServer_hlog, 1).
+[brick_simple:set(tab1, "foo"++integer_to_list(X), "Else!!!") || X <- lists:seq(1,50)].
+ets:tab2list(tab1_ch1_b2_store).
+brick_simple:get(tab1, "foo100").
+
+%%% sync testing
+
+brick_admin:fast_sync({tab1_ch4_b1, foo@bar}, {tab1_ch4_b2, node()}, gdss2@bb3, [{throttle_bytes, 5*1024*1024}]).
+brick_admin:fast_sync_clone_node(gdss2@bb3, newNEW@bb3, [{throttle_bytes, 1000}]).
+
+%%% squorum testing
+squorum_qc:start_bricks().
+Bs2 = [{squorum_test1,node()}, {squorum_test2,node()}].
+brick_squorum:set(Bs2, "foo", "foo!").
+brick_server:delete(squorum_test1,node(), "foo").
+brick_squorum:get(Bs2, "foo").
+

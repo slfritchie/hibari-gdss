@@ -1,0 +1,33 @@
+rp(lists:sort(registered())).                                
+[{ok=brick_test0:chain_t55(Os), Os} || Os <- brick_test0:make_brick_option_lists()].
+code:add_pathz("../../../erl-third-party/sics/ubf__HEAD/ebin").
+code:add_pathz("../../gdss-ubf-proto__HEAD/ebin").
+code:add_pathz("../../gdss-ubf-proto__HEAD/src/Unit-EUnit-Files").
+code:add_pathz("/home/fritchie/gemini/svn.M2H/src/erl-third-party/lshift/erlang-rfc4627__HEAD/ebin").
+code:add_pathz("/c/fritchie/gemini/svn.M2H/src/erl-tools/gmt-ubf__HEAD/ebin").
+application:start(gdss_ubf_proto).
+[brick_server:checkpoint(X,Y) || {X,Y} <- brick_shepherd:list_bricks_all_nodes()].
+
+gmt_elog:start_tracing("/tmp/trace80").
+gmt_elog:add_match_spec(dbg:fun2ms(fun([_, _, _, _, _, _]) -> return_trace() end)).
+gmt_elog:stop_tracing().
+gmt_elog:format_file("/tmp/trace80", "/tmp/trace80.out").
+hlog_local_qc:nul_check().
+gmt_hlog_common:start_scavenger_commonlog([]).
+
+% pwd
+/c/fritchie/gemini/svn.loadsrv-ubf-foo/src/loadsrv_ubf-nttr__HEAD
+././././loadsrv -i -p 1 -R 888 -t 850:850 -b o:localhost:7580=./.libs/libgmt_loadsrv_ebf_gdss.so -s -e RANDOMBASE=0 -e RANDOMN=1000 -e VALUE_LEN=5000 -e SEQUENTIAL_KEYS=1 -e GDSS_OP=set -I 1 -T 300
+
+More tracing for migration testing, even easier to use:
+  In CLI 1:
+    begin gmt_elog:stop_tracing(), gmt_elog:start_tracing("/tmp/trace45"), gmt_elog:add_match_spec(dbg:fun2ms(fun([_, _, _, _, _, _]) -> return_trace() end)), simple_qc:wrap_with_stopfile(150) end.
+  In CLI 2 (attached to the same machine as CLI 1, run after CLI 1 cmd starts):
+    simple_qc:change_num_chains_while_qc_running().
+
+Or (change seq iters and wrap_with_stopfile arg size):
+
+SPEC = dbg:fun2ms(fun([_, _, _, _, _, _]) -> return_trace() end).
+[begin File = "/mnta/slf/trace2."++integer_to_list(X), io:format("\n\n\n\nQQQXXXYYYZZZ: now on tracefile ~s\n\n\n\n\n", [File]), gmt_elog:stop_tracing(), gmt_elog:start_tracing(File), spawn(fun() -> timer:sleep(1000), simple_qc:change_num_chains_while_qc_running() end), gmt_elog:add_match_spec(SPEC), XX = simple_qc:wrap_with_stopfile(1000), timer:sleep(3000), gmt_elog:stop_tracing(), os:cmd("gzip "++File), {XX, X} end || X <- lists:seq(1,50)].
+offline + tracing:
+[begin File = "/mnta/slf/traceOff."++integer_to_list(X), io:format("\n\n\n\nQQQXXXYYYZZZ: now on tracefile ~s\n\n\n\n\n", [File]), gmt_elog:stop_tracing(), gmt_elog:start_tracing(File), gmt_elog:add_match_spec(SPEC), XX = simple_qc_offline:run_offline_file_with_chain_changes("/tmp/noo.10k", 300), timer:sleep(3000), gmt_elog:stop_tracing(), os:cmd("gzip "++File), {XX, X} end || X <- lists:seq(1,12)].
